@@ -15,6 +15,7 @@ public class Enemy : MonoBehaviour
     private GameObject _laserPrefab;
     private float _fireRate = 3.0f;
     private float _canFIre = -1.0f;
+    private bool _hitted = false;
 
     // Start is called before the first frame update
     private void Start()
@@ -39,7 +40,7 @@ public class Enemy : MonoBehaviour
     {
         CalculateMovement();
 
-        if (Time.time > _canFIre)
+        if (Time.time > _canFIre && !_hitted)
             FireLaser();
     }
 
@@ -67,6 +68,8 @@ public class Enemy : MonoBehaviour
     {
         if (other.gameObject.CompareTag("Player"))
         {
+            _hitted = true;
+            gameObject.tag = "Untagged";
             Player player = other.GetComponent<Player>();
             if (player != null)
                 player.Damage();
@@ -77,6 +80,8 @@ public class Enemy : MonoBehaviour
         }
         else if (other.gameObject.CompareTag("Laser"))
         {
+            _hitted = true;
+            gameObject.tag = "Untagged";
             if (_player != null)
                 _player.AddScore(10);
             Destroy(other.gameObject);
@@ -86,5 +91,10 @@ public class Enemy : MonoBehaviour
             Destroy(GetComponent<Collider2D>());
             Destroy(this.gameObject, 2.8f);
         }
+    }
+
+    public bool Hitted()
+    {
+        return _hitted;
     }
 }

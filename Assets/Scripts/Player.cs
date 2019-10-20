@@ -6,13 +6,21 @@ using UnityStandardAssets.CrossPlatformInput;
 public class Player : MonoBehaviour
 {
     [SerializeField]
+    private int _maxAmmo = 15;
+    [SerializeField]
     private float _speed = 4.5f;
     [SerializeField]
+    private float _speedThrusters = 1.5f;
+    [SerializeField]
     private float _speedMultiplier = 2.0f;
+    [SerializeField]
+    private Thruster _thruster;
     [SerializeField]
     private GameObject _laserPrefab;
     [SerializeField]
     private GameObject _tripleShotPrefab;
+    [SerializeField]
+    private GameObject _missilesPrefab;
     [SerializeField]
     private float _fireRate = 0.25f;
     private float _canFire = -1.0f;
@@ -22,11 +30,13 @@ public class Player : MonoBehaviour
     [SerializeField]
     private bool _isTripleShotActive = false;
     [SerializeField]
+    private bool _isMissilesActive = false;
+    [SerializeField]
     private bool _isSpeedUpActive = false;
     [SerializeField]
     private bool _isShieldActive = false;
     [SerializeField]
-    private GameObject _shieldVisualizer;
+    private Shield _shieldVisualizer;
     [SerializeField]
     private int _score;
     private UIManager _uiManager;
@@ -35,12 +45,24 @@ public class Player : MonoBehaviour
     [SerializeField]
     private AudioClip _laserSoundClip;
     [SerializeField]
+    private AudioClip _errorSoundClip;
+    [SerializeField]
     private AudioClip _explosionSoundClip;
     private AudioSource _audioSource;
     private GameManager _gameManager;
+    private CameraShake _cameraShake;
     [SerializeField]
     private bool _isPlayerOne = true;
     private PlayerAnimation _playerAnimation;
+    private int _actualAmmo;
+    [SerializeField]
+    private float _shakeDuration = 0.3f, _shakeMagnitud = 0.1f;
+    private float _thrusterPercentage = 100.0f;
+    [SerializeField]
+    private float _thrusterLenght = 5.0f;
+    [SerializeField]
+    private float _thrusterRecoveryTime = 10.0f;
+    private float _thrusterIncreaser = 0.0f, _thrusterDecreaser = 0.0f;
 
     // Start is called before the first frame update
     void Start()
@@ -51,6 +73,10 @@ public class Player : MonoBehaviour
 
         if(!_gameManager.IsCoopMode())
             transform.position = new Vector3(0, 0, 0);
+
+        _cameraShake = GameObject.Find("CameraContainer/Main Camera").GetComponent<CameraShake>();
+        if (_cameraShake == null)
+            Debug.LogError("Camera Shake is null");
 
         _spawnManager = GameObject.Find("SpawnManager").GetComponent<SpawnManager>();
         if(_spawnManager == null)
@@ -69,6 +95,8 @@ public class Player : MonoBehaviour
         _playerAnimation = GetComponent<PlayerAnimation>();
         if (_playerAnimation == null)
             Debug.LogError("PlayerAnimation is null");
+
+        Reload();
     }
 
     // Update is called once per frame
@@ -97,13 +125,26 @@ public class Player : MonoBehaviour
 
     void FireLaser()
     {
-        _canFire = Time.time + _fireRate;
+        if(_actualAmmo > 0)
+        {
+            --_actualAmmo;
+            _canFire = Time.time + _fireRate;
 
-        if (_isTripleShotActive)
-            Instantiate(_tripleShotPrefab, transform.position + new Vector3(0, 0, 0), Quaternion.identity);
+            if (_isTripleShotActive)
+                Instantiate(_tripleShotPrefab, transform.position, Quaternion.identity);
+            else if (_isMissilesActive)
+                Instantiate(_missilesPrefab, transform.position, Quaternion.identity);
+            else
+                Instantiate(_laserPrefab, transform.position + new Vector3(0, 1.0f, 0), Quaternion.identity);
+            
+            _uiManager.ChangeAmmo(_actualAmmo);
+
+            _audioSource.clip = _laserSoundClip;
+        }
         else
-            Instantiate(_laserPrefab, transform.position + new Vector3(0, 1.0f, 0), Quaternion.identity);
-        
+        {
+            _audioSource.clip = _errorSoundClip;
+        }
         _audioSource.Play();
     }
 
@@ -137,9 +178,37 @@ public class Player : MonoBehaviour
         }
 
         float actualSpeed = _speed;
+        if (Input.GetKey(KeyCode.LeftShift))
+        {
+            if(_thrusterPercentage > 0.0f)
+            {
+                _thrusterDecreaser = (Time.deltaTime * 100) / _thrusterLenght;
+                _thrusterPercentage -= _thrusterDecreaser;
+                if (_thrusterPercentage < 0.0f)
+                    _thrusterPercentage = 0.0f;
+                actualSpeed += _speedThrusters;
+                if (!_thruster.IsBossted())
+                    _thruster.Boost();
+                _uiManager.UpdateThruster(_thrusterPercentage);
+            }
+        }
+        else
+        {
+            if(_thrusterPercentage < 100.0f)
+            {
+                _thrusterIncreaser = (Time.deltaTime * 100) / _thrusterRecoveryTime;
+                _thrusterPercentage += _thrusterIncreaser;
+                if (_thrusterPercentage > 100.0f)
+                    _thrusterPercentage = 100.0f;
+                _uiManager.UpdateThruster(_thrusterPercentage);
+            }
+            if (_thruster.IsBossted())
+                _thruster.Normal();
+        }
+        
         if (_isSpeedUpActive)
             actualSpeed *= _speedMultiplier;
-
+        
         transform.Translate(new Vector3(horizontalInput, verticalInput, 0) * actualSpeed * Time.deltaTime);
 
         transform.position = new Vector3(transform.position.x, Mathf.Clamp(transform.position.y, -3.8f, 0), 0);
@@ -157,6 +226,14 @@ public class Player : MonoBehaviour
     void PlayerTwoMovement()
     {
         float actualSpeed = _speed;
+        if (Input.GetKey(KeyCode.RightShift))
+        {
+            actualSpeed += _speedThrusters;
+            if (!_thruster.IsBossted())
+                _thruster.Boost();
+        }
+        else if (_thruster.IsBossted())
+            _thruster.Normal();
         if (_isSpeedUpActive)
             actualSpeed *= _speedMultiplier;
 
@@ -196,10 +273,12 @@ public class Player : MonoBehaviour
 
     public void Damage()
     {
-        if(_isShieldActive)
+        StartCoroutine(_cameraShake.ShakeStart(_shakeDuration, _shakeMagnitud));
+
+        if (_isShieldActive)
         {
-            _isShieldActive = false;
-            _shieldVisualizer.SetActive(_isShieldActive);
+            _isShieldActive = _shieldVisualizer.ReceiveDamage();
+            _uiManager.UpdateShield(_shieldVisualizer.DamageResistance());
             return;
         }
         _lives--;
@@ -220,6 +299,26 @@ public class Player : MonoBehaviour
         }
     }
 
+    public void RecoverHealth()
+    {
+        ++_lives;
+        if (_lives > 3)
+            _lives = 3;
+
+        if (_lives == 3)
+            _leftEngine.SetActive(false);
+        else if (_lives == 2)
+            _rightEngine.SetActive(false);
+
+        _uiManager.UpdateLives(_lives);
+    }
+
+    public void Reload()
+    {
+        _actualAmmo = _maxAmmo;
+        _uiManager.ChangeAmmo(_actualAmmo);
+    }
+
     public void TripleShotActive()
     {
         _isTripleShotActive = true;
@@ -230,6 +329,18 @@ public class Player : MonoBehaviour
     {
         yield return new WaitForSeconds(5.0f);
         _isTripleShotActive = false;
+    }
+
+    public void MissilesActive()
+    {
+        _isMissilesActive = true;
+        StartCoroutine(MissilesPowerDownRoutine());
+    }
+
+    IEnumerator MissilesPowerDownRoutine()
+    {
+        yield return new WaitForSeconds(5.0f);
+        _isMissilesActive = false;
     }
 
     public void SpeedUpActive()
@@ -247,7 +358,8 @@ public class Player : MonoBehaviour
     public void ShieldActive()
     {
         _isShieldActive = true;
-        _shieldVisualizer.SetActive(_isShieldActive);
+        _shieldVisualizer.TurnOn();
+        _uiManager.UpdateShield(_shieldVisualizer.DamageResistance());
     }
 
     public void AddScore(int points)

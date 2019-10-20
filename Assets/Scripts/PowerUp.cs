@@ -41,6 +41,15 @@ public class PowerUp : MonoBehaviour
                     case 2:
                         player.ShieldActive();
                         break;
+                    case 3:
+                        player.RecoverHealth();
+                        break;
+                    case 4:
+                        player.Reload();
+                        break;
+                    case 5:
+                        player.MissilesActive();
+                        break;
                     default:
                         Debug.Log("Default Value");
                         break;
