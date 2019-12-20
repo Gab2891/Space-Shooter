@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class Enemy : MonoBehaviour
 {
+    public enum MoveDirection { DOWN, RIGHT, LEFT};
     [SerializeField]
     private float _speed = 4.0f;
     private Player _player;
@@ -16,6 +17,7 @@ public class Enemy : MonoBehaviour
     private float _fireRate = 3.0f;
     private float _canFIre = -1.0f;
     private bool _hitted = false;
+    private Vector3 movDirection = Vector3.down;
 
     // Start is called before the first frame update
     private void Start()
@@ -44,6 +46,21 @@ public class Enemy : MonoBehaviour
             FireLaser();
     }
 
+    public void SetMovDirection(MoveDirection direction)
+    {
+        switch (direction) {
+            case MoveDirection.DOWN:
+                movDirection = Vector3.down;
+                break;
+            case MoveDirection.LEFT:
+                movDirection = Vector3.left;
+                break;
+            case MoveDirection.RIGHT:
+                movDirection = Vector3.right;
+                break;
+        }
+    }
+
     private void FireLaser()
     {
         _fireRate = Random.Range(3.0f, 7.0f);
@@ -56,11 +73,19 @@ public class Enemy : MonoBehaviour
 
     void CalculateMovement()
     {
-        transform.Translate(Vector3.down * _speed * Time.deltaTime);
+        transform.Translate(movDirection * _speed * Time.deltaTime);
 
-        if (transform.position.y < -5.5f)
+        if (movDirection == Vector3.down && transform.position.y < -5.5f)
         {
             transform.position = new Vector3(Random.Range(-10.0f, 10.0f), 7.0f, 0);
+        }
+        else if (movDirection == Vector3.right && transform.position.x > 12.5f)
+        {
+            transform.position = new Vector3(-13.0f, Random.Range(0.0f, 6.0f), 0);
+        }
+        else if (movDirection == Vector3.left && transform.position.x < -12.5f)
+        {
+            transform.position = new Vector3(13.0f, Random.Range(0.0f, 6.0f), 0);
         }
     }
 
@@ -72,7 +97,7 @@ public class Enemy : MonoBehaviour
             gameObject.tag = "Untagged";
             Player player = other.GetComponent<Player>();
             if (player != null)
-                player.Damage();
+                player.Damage(Player.DamageReceivedBy.ENEMY_COLLISION, this.gameObject);
             _animator.SetTrigger("OnEnemyDeath");
             _speed = 0;
             _audioSource.Play();

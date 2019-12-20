@@ -30,6 +30,10 @@ public class UIManager : MonoBehaviour
     [SerializeField]
     private Color _emptyThrusterColor = new Color(0.4f, 0.4f, 0.4f, 1.0f);
     private float _colorRedRange = 0.0f, _colorGreenRange = 0.0f, _colorBlueRange = 0.0f;
+    [SerializeField]
+    private Text _waveText;
+    [SerializeField]
+    private Text _remainingEnemiesText;
 
     // Start is called before the first frame update
     void Start()
@@ -48,15 +52,25 @@ public class UIManager : MonoBehaviour
         _colorBlueRange = 1.0f - _emptyThrusterColor.b;
     }
     
+    public void WaveInfoChange(int actualWave, int totalWave)
+    {
+        _waveText.text = "Wave: " + actualWave + "/" + totalWave;
+    }
+
+    public void RemainingEnemiesChange(int enemies)
+    {
+        _remainingEnemiesText.text = "Enemies: " + enemies;
+    }
+
     public void ChangeScore(int score)
     {
         _scoreText.text = "Score: " + score;
         CheckForBestScore(score);
     }
 
-    public void ChangeAmmo(int ammo)
+    public void ChangeAmmo(int ammo, int maxAmmo)
     {
-        _ammoText.text = "x "+ammo;
+        _ammoText.text = "x "+ammo+"/"+maxAmmo;
     }
 
     public void UpdateLives(int currentLives)

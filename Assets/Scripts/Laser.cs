@@ -52,7 +52,7 @@ public class Laser : MonoBehaviour
         {
             Player player = other.GetComponent<Player>();
             if (player != null)
-                player.Damage();
+                player.Damage(Player.DamageReceivedBy.LASER, this.gameObject);
         }
     }
 }

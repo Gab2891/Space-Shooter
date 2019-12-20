@@ -5,6 +5,7 @@ using UnityStandardAssets.CrossPlatformInput;
 
 public class Player : MonoBehaviour
 {
+    public enum DamageReceivedBy {ENEMY_COLLISION, LASER};
     [SerializeField]
     private int _maxAmmo = 15;
     [SerializeField]
@@ -63,6 +64,7 @@ public class Player : MonoBehaviour
     [SerializeField]
     private float _thrusterRecoveryTime = 10.0f;
     private float _thrusterIncreaser = 0.0f, _thrusterDecreaser = 0.0f;
+    private GameObject _lastObjectDamage;
 
     // Start is called before the first frame update
     void Start()
@@ -137,7 +139,7 @@ public class Player : MonoBehaviour
             else
                 Instantiate(_laserPrefab, transform.position + new Vector3(0, 1.0f, 0), Quaternion.identity);
             
-            _uiManager.ChangeAmmo(_actualAmmo);
+            _uiManager.ChangeAmmo(_actualAmmo, _maxAmmo);
 
             _audioSource.clip = _laserSoundClip;
         }
@@ -271,8 +273,14 @@ public class Player : MonoBehaviour
         }
     }
 
-    public void Damage()
+    public void Damage(DamageReceivedBy receivedBy, GameObject receivedByObject)
     {
+        if (receivedBy == DamageReceivedBy.ENEMY_COLLISION && _lastObjectDamage != receivedByObject)
+        {
+            _spawnManager.KillEnemy();
+            _lastObjectDamage = receivedByObject;
+        }
+            
         StartCoroutine(_cameraShake.ShakeStart(_shakeDuration, _shakeMagnitud));
 
         if (_isShieldActive)
@@ -316,7 +324,7 @@ public class Player : MonoBehaviour
     public void Reload()
     {
         _actualAmmo = _maxAmmo;
-        _uiManager.ChangeAmmo(_actualAmmo);
+        _uiManager.ChangeAmmo(_actualAmmo, _maxAmmo);
     }
 
     public void TripleShotActive()
@@ -366,5 +374,6 @@ public class Player : MonoBehaviour
     {
         _score += points;
         _uiManager.ChangeScore(_score);
+        _spawnManager.KillEnemy();
     }
 }
